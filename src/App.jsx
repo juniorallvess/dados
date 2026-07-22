@@ -381,6 +381,8 @@ function App() {
               </>
             )}
 
+          </div>
+
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', width: '100%' }}>
             <div style={{ flex: '1 1 45%', minWidth: '300px' }}>
               <DataTable 
