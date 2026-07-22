@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Download, CheckSquare, Square, Trash2 } from 'lucide-react';
 
-export function DataTable({ data, columns, duplicates, onExport, onClearData }) {
+export function DataTable({ data, columns, duplicates, onExport, onClearData, title = "Visualização de Dados" }) {
   const [filters, setFilters] = useState({});
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -89,10 +89,10 @@ export function DataTable({ data, columns, duplicates, onExport, onClearData }) 
   };
 
   return (
-    <div className="card fade-in" style={{ marginTop: '2rem' }}>
+    <div className="card fade-in" style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="table-actions">
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>Visualização de Dados</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.25rem' }}>{title}</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
             {filteredData.length} registros encontrados • {selectedIds.size} selecionados
           </p>

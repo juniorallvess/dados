@@ -49,6 +49,20 @@ export const parseFile = (file) => {
 };
 
 /**
+ * Normaliza uma string para comparação: 
+ * Remove acentos, pontuação, espaços e deixa tudo minúsculo.
+ * Isso garante que "JOÃO", "Joao", " João " e "J.O.A.O" sejam considerados iguais.
+ */
+export const normalizeKey = (val) => {
+  if (val === undefined || val === null) return '';
+  return String(val)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-zA-Z0-9]/g, '') // Remove espaços, pontuação, hífens, etc.
+    .toLowerCase();
+};
+
+/**
  * Encontra duplicidades baseado em uma coluna específica ou na linha inteira.
  * Retorna os IDs das linhas que são duplicadas.
  */
@@ -62,15 +76,13 @@ export const findDuplicates = (data, duplicateColumn = 'ALL') => {
     if (duplicateColumn === 'ALL') {
       // Usamos os valores da linha (sem o _id) para criar uma chave única
       const { _id, ...rest } = row;
-      key = JSON.stringify(rest);
+      key = Object.values(rest).map(normalizeKey).join('|');
     } else {
-      key = row[duplicateColumn];
+      key = normalizeKey(row[duplicateColumn]);
     }
     
-    // Converte a chave para string para evitar problemas de tipo
-    key = String(key).trim().toLowerCase();
+    // Ignora chaves vazias
 
-    // Ignora chaves vazias (não considera células vazias como duplicadas entre si)
     if (key === '') return;
 
     if (seen.has(key)) {
@@ -105,21 +117,87 @@ export const compareFiles = (dataA, colA, dataB, colB) => {
   const keysInB = new Set();
   
   dataB.forEach(row => {
-    const val = row[colB];
-    if (val !== undefined && val !== null) {
-      const strVal = String(val).trim().toLowerCase();
-      if (strVal !== '') {
-        keysInB.add(strVal);
-      }
+    const key = normalizeKey(row[colB]);
+    if (key !== '') {
+      keysInB.add(key);
     }
   });
 
   return dataA.map(row => {
-    const val = row[colA];
-    const key = (val !== undefined && val !== null) ? String(val).trim().toLowerCase() : '';
+    const key = normalizeKey(row[colA]);
     return {
       ...row,
       _encontrado: (key !== '' && keysInB.has(key)) ? 'Sim' : 'Não'
     };
+  });
+};
+
+/**
+ * Retorna a Planilha de Referência (dataB) excluindo as linhas que possuem correspondência 
+ * na Planilha Principal (dataA), ou seja, subtraindo os duplicados.
+ */
+export const getUnmatchedReference = (dataA, colA, dataB, colB) => {
+  const keysInA = new Set();
+  
+  dataA.forEach(row => {
+    const key = normalizeKey(row[colA]);
+    if (key !== '') {
+      keysInA.add(key);
+    }
+  });
+
+  const seenInB = new Set();
+
+  return dataB.filter(row => {
+    const key = normalizeKey(row[colB]);
+    
+    // Se a chave estiver vazia, mantemos a linha e não filtramos
+    if (key === '') return true;
+
+    // Se já vimos essa chave dentro da PRÓPRIA Planilha B (duplicidade interna), excluímos
+    if (seenInB.has(key)) return false;
+
+    // Se a chave existe na Planilha A, excluímos (cruzamento)
+    if (keysInA.has(key)) return false;
+
+    // Marca como vista na Planilha B para as próximas linhas
+    seenInB.add(key);
+    
+    return true;
+  });
+};
+
+/**
+ * Retorna a Planilha de Referência (dataB) contendo APENAS as linhas que POSSUEM correspondência
+ * na Planilha Principal (dataA).
+ */
+export const getMatchedReference = (dataA, colA, dataB, colB) => {
+  const keysInA = new Set();
+  
+  dataA.forEach(row => {
+    const key = normalizeKey(row[colA]);
+    if (key !== '') {
+      keysInA.add(key);
+    }
+  });
+
+  const seenInB = new Set();
+
+  return dataB.filter(row => {
+    const key = normalizeKey(row[colB]);
+    
+    // Se a chave estiver vazia, ignoramos
+    if (key === '') return false;
+
+    // Se já vimos, removemos (duplicidade interna)
+    if (seenInB.has(key)) return false;
+
+    // Se a chave NÃO existe na Planilha A, excluímos (queremos apenas os que deram match)
+    if (!keysInA.has(key)) return false;
+
+    // Marca como vista na Planilha B para as próximas linhas
+    seenInB.add(key);
+    
+    return true;
   });
 };

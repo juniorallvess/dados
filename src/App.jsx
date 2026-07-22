@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { CompareUpload } from './components/CompareUpload';
 import { DataTable } from './components/DataTable';
-import { parseFile, findDuplicates, exportFile, compareFiles } from './utils/spreadsheetHelpers';
-import { Layers, Scissors, ArrowRightLeft, ChevronLeft } from 'lucide-react';
+import { parseFile, findDuplicates, exportFile, compareFiles, getUnmatchedReference, getMatchedReference } from './utils/spreadsheetHelpers';
+import { Layers, Scissors, ArrowRightLeft, ChevronLeft, Download, CheckCircle } from 'lucide-react';
 
 function App() {
   const [mode, setMode] = useState(null); // null | 'dedupe' | 'compare'
   const [step, setStep] = useState(0); // 0: upload, 1: config, 2: table
+  const [showOptions, setShowOptions] = useState(false);
   
   // States comuns e Dedupe
   const [data, setData] = useState([]);
@@ -93,18 +94,26 @@ function App() {
   // Derivação dos dados a exibir
   let dataToDisplay = data;
   let finalColumns = columns;
+  let dataToDisplayB = dataB;
+  let finalColumnsB = columnsB;
   let foundCount = 0;
 
   if (mode === 'dedupe') {
     // Agora mostramos todos os dados na tabela, a remoção ocorre apenas no momento da exportação
     dataToDisplay = data;
   } else if (mode === 'compare' && step === 2) {
-    // Para modo comparação, geramos os dados comparados
+    // Para modo comparação, geramos os dados comparados para a Tabela A
     dataToDisplay = compareFiles(data, compareColA, dataB, compareColB);
     if (!finalColumns.includes('_encontrado')) {
       finalColumns = ['_encontrado', ...columns];
     }
     foundCount = dataToDisplay.filter(row => row._encontrado === 'Sim').length;
+
+    // Geramos os dados comparados para a Tabela B (referência)
+    dataToDisplayB = compareFiles(dataB, compareColB, data, compareColA);
+    if (!finalColumnsB.includes('_encontrado')) {
+      finalColumnsB = ['_encontrado', ...columnsB];
+    }
   }
 
   // Avança para a tabela
@@ -120,6 +129,16 @@ function App() {
     exportFile(dataToExport, mode === 'dedupe' ? 'dados_limpos.xlsx' : 'dados_comparados.xlsx');
   };
 
+  const handleExportReference = () => {
+    const referenceData = getUnmatchedReference(data, compareColA, dataB, compareColB);
+    exportFile(referenceData, 'referencia_NAO_encontrados.xlsx');
+  };
+
+  const handleExportMatchedReference = () => {
+    const referenceData = getMatchedReference(data, compareColA, dataB, compareColB);
+    exportFile(referenceData, 'referencia_APENAS_encontrados.xlsx');
+  };
+
   const handleClear = () => {
     setData([]);
     setColumns([]);
@@ -128,6 +147,7 @@ function App() {
     setColumnsB([]);
     setStep(0);
     setMode(null);
+    setShowOptions(false);
     setError(null);
   };
 
@@ -146,7 +166,7 @@ function App() {
         )}
         <h1>
           <Layers style={{ display: 'inline', marginRight: '10px', color: 'var(--primary-color)' }} size={40} />
-          DataClean
+          EasySheets
         </h1>
         <p>Detecte, limpe e compare dados em planilhas de forma fácil e rápida.</p>
       </header>
@@ -163,8 +183,25 @@ function App() {
         </div>
       )}
 
+      {/* TELA INICIAL (LANDING PAGE) */}
+      {!loading && !mode && !showOptions && (
+        <div className="fade-in" style={{ textAlign: 'center', marginTop: '4rem' }}>
+          <h2 style={{ fontSize: '2.5rem', marginBottom: '1rem', color: 'var(--text-primary)' }}>Bem-vindo ao EasySheets</h2>
+          <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', marginBottom: '3rem', maxWidth: '600px', margin: '0 auto 3rem auto' }}>
+            A ferramenta definitiva para limpar, organizar e comparar suas planilhas em poucos cliques, sem enviar seus dados para nenhum servidor.
+          </p>
+          <button 
+            className="btn btn-primary" 
+            style={{ fontSize: '1.25rem', padding: '1rem 3rem', borderRadius: '50px' }}
+            onClick={() => setShowOptions(true)}
+          >
+            Start
+          </button>
+        </div>
+      )}
+
       {/* TELA INICIAL: SELEÇÃO DE MODO */}
-      {!loading && !mode && (
+      {!loading && !mode && showOptions && (
         <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center', flexWrap: 'wrap', marginTop: '2rem' }}>
           <div className="card fade-in" style={{ flex: '1 1 300px', cursor: 'pointer', textAlign: 'center' }} onClick={() => handleSelectMode('dedupe')}>
             <Scissors size={48} color="var(--primary-color)" style={{ margin: '0 auto 1rem auto' }} />
@@ -323,18 +360,52 @@ function App() {
                     Nenhum cruzamento encontrado
                   </span>
                 )}
+
+                <div style={{ display: 'flex', gap: '0.5rem', marginLeft: '1rem', flexWrap: 'wrap' }}>
+                  <button 
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--success-color)' }}
+                    onClick={handleExportMatchedReference}
+                  >
+                    <CheckCircle size={16} /> Baixar Ref. ENCONTRADOS
+                  </button>
+
+                  <button 
+                    className="btn btn-outline"
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    onClick={handleExportReference}
+                  >
+                    <Download size={16} /> Baixar Ref. NÃO ENCONTRADOS
+                  </button>
+                </div>
               </>
             )}
 
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', width: '100%' }}>
+            <div style={{ flex: '1 1 45%', minWidth: '300px' }}>
+              <DataTable 
+                data={dataToDisplay}
+                columns={finalColumns}
+                duplicates={mode === 'dedupe' ? duplicates : []}
+                onExport={(exportData) => exportFile(exportData, mode === 'dedupe' ? 'dados_limpos.xlsx' : 'planilha_principal_comparada.xlsx')}
+                onClearData={handleClear}
+                title={mode === 'compare' ? "Planilha Principal" : "Visualização de Dados"}
+              />
+            </div>
+            
+            {mode === 'compare' && (
+              <div style={{ flex: '1 1 45%', minWidth: '300px' }}>
+                <DataTable 
+                  data={dataToDisplayB}
+                  columns={finalColumnsB}
+                  duplicates={[]}
+                  onExport={(exportData) => exportFile(exportData, 'planilha_referencia_comparada.xlsx')}
+                  onClearData={handleClear}
+                  title="Planilha de Referência"
+                />
+              </div>
+            )}
           </div>
-
-          <DataTable 
-            data={dataToDisplay}
-            columns={finalColumns}
-            duplicates={mode === 'dedupe' ? duplicates : []}
-            onExport={handleExport}
-            onClearData={handleClear}
-          />
         </>
       )}
     </div>
