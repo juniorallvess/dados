@@ -383,8 +383,8 @@ function App() {
 
           </div>
 
-          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', width: '100%' }}>
-            <div style={{ flex: '1 1 45%', minWidth: '300px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%' }}>
+            <div style={{ width: '100%' }}>
               <DataTable 
                 data={dataToDisplay}
                 columns={finalColumns}
@@ -396,7 +396,7 @@ function App() {
             </div>
             
             {mode === 'compare' && (
-              <div style={{ flex: '1 1 45%', minWidth: '300px' }}>
+              <div style={{ width: '100%' }}>
                 <DataTable 
                   data={dataToDisplayB}
                   columns={finalColumnsB}
